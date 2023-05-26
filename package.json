@@ -1,0 +1,15 @@
+{
+  "name": "bercow2",
+  "version": "0.0.0",
+  "devDependencies": {
+    "@types/node": "^20.2.3",
+    "c8": "^7.13.0",
+    "eslint": "^8.41.0",
+    "prettier": "^2.8.8",
+    "prettier-plugin-jsdoc": "^0.4.2",
+    "typescript": "^5.0.4"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.21.9"
+  }
+}
