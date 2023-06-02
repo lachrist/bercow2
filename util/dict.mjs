@@ -1,6 +1,6 @@
 import { cons, filter, find, nil, some } from "./list.mjs";
-import { mapMaybe } from "./maybe.mjs";
-import { getFirst, getSecond, pairup } from "./pair.mjs";
+import { mapMaybe } from "../maybe.mjs";
+import { getFirst, getSecond, pairup } from "../lib/pair.mjs";
 
 /**
  * @template K, V

@@ -1,4 +1,4 @@
-import { just, nothing } from "./maybe.mjs";
+import { just, nothing } from "../maybe.mjs";
 
 /** @type {Nil} */
 export const nil = null
@@ -49,7 +49,7 @@ export const tail = (/** @type {Cons<X>} */{cdr}) => cdr;
 
 /**
  * @template X
- * @param {function(X): boolean} p
+ * @param {(x: X) => boolean} p
  * @param {List<X>} xs
  * @return {boolean}
  */
@@ -66,7 +66,7 @@ export const some = (p, xs) => {
 
 /**
  * @template X
- * @param {function(X): boolean} p
+ * @param {(x: X) => boolean} p
  * @param {List<X>} xs
  * @return {boolean}
  */
@@ -107,7 +107,7 @@ export const elem = (x, xs) => {
 
 /**
  * @template X, Y
- * @param {function(X, Y): Y} f
+ * @param {(x: X, y: Y) => Y} f
  * @param {Y} y
  * @param {List<X>} xs
  * @return {Y}
@@ -123,7 +123,7 @@ export const foldr = (f, y, xs) => {
 
 /**
  * @template X, Y
- * @param {function(X): Y} f
+ * @param {(x: X) => Y} f
  * @param {List<X>} xs
  * @return {List<Y>}
  */
@@ -131,7 +131,7 @@ export const map = (f, xs) => foldr((x, ys) => ({car: f(x), cdr: ys}), /** @type
 
 /**
  * @template X
- * @param {function(X): boolean} p
+ * @param {(x: X) => boolean} p
  * @param {List<X>} xs1
  * @return {List<X>}
  */
@@ -139,7 +139,7 @@ export const filter = (p, xs1) => foldr((x, xs2) => p(x) ? {car: x, cdr: xs2} : 
 
 /**
  * @template X, Y
- * @param {function(Y, X): Y} f
+ * @param {(y: Y, x: X) => Y} f
  * @param {Y} y
  * @param {List<X>} xs
  * @return {Y}
@@ -155,7 +155,7 @@ export const foldl = (f, y, xs) => {
 
 /**
  * @template X
- * @param {function(X): boolean} p
+ * @param {(x: X) => boolean} p
  * @param {List<X>} xs
  * @return {Maybe<X>}
  */
