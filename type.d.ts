@@ -44,7 +44,7 @@ type Message = string;
 type DigestResult = Either<Message, Hash>;
 type Digest = (specifier: Specifier) => Promise<DigestResult>;
 
-type LinkResult = Either<Message, Specifier[]>;
+type LinkResult = Either<Message, Set<Specifier>>;
 type Link = (specifier: Specifier) => Promise<LinkResult>;
 
 type ValidateResult = Either<Message, null>;
@@ -56,7 +56,7 @@ type Stage = "digest" | "link" | "validate";
 
 type DigestAction = {type: "digest", specifier: Specifier};
 type LinkAction = {type: "link", specifier: Specifier};
-type ValidateAction = {type: "validate", specifiers: Specifier[]};
+type ValidateAction = {type: "validate", component: Component};
 
 type Action = DigestAction | LinkAction | ValidateAction;
 
@@ -70,14 +70,13 @@ type Status =
   | { type: "failure", stage: Stage, message: Message }
   | { type: "success", stage: Stage }
   | { type: "pending", stage: Stage }
-  | { type: "impact", causes: Specifier[] }
+  | { type: "impact", causes: Set<Specifier> }
   | { type: "done" };
 
 type Node = {
   status: Status,
-  specifier: Specifier;
   hash: Maybe<Hash>;
-  dependencies: Maybe<Specifier[]>;
+  dependencies: Set<Specifier>;
 };
 
 // type Node =
@@ -94,15 +93,17 @@ type Node = {
 //   | { status: { type: "impact", stage: "validate", causes: Specifier[] }, specifier: Specifier, hash: Just<Hash>, dependencies: Just<Set<Specifier>> }
 //   | { status: { type: "done" }, specifier: Specifier, hash: Just<Hash>, dependencies: Just<Set<Specifier>> };
 
-type State = {nodes: Node[], components: Set<Specifier>[]};
+type Component = Set<Specifier>;
 
-type Cache = Map<Specifier, Node>;
+type Graph = Map<Specifier, Node>;
 
-type step = (
-  current: State,
-  specifier: Specifier,
-  result: Result,
-) => Either<Message, { next: State; actions: Action[] }>;
+type State = {graph: Graph, components: Component[]};
+
+type Input = {state: State, specifier: Specifier, result: Result};
+
+type Output = Either<Message, {state: State, actions: Action[]}>;
+
+type step = (input: Input) => Output;
 
 // type Node =
 //   | { type: "todo" }
