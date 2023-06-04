@@ -1,44 +1,76 @@
-import { getMapStrict, insertMap, transposeMap } from "./map.mjs";
-import { getFirst } from "./pair.mjs";
+import { toArray } from "./collection.mjs";
 
 /**
  * @template N
- * @typedef {{ counter: Index; partition: Partition<N> }} CounterPartition<N>
- */
-
-/**
- * @template N
- * @param {CounterPartition<N>} counter_and_partition
- * @param {N[]} nodes
- * @returns {CounterPartition<N>}
- */
-const addAllPartitionNode = ({ counter, partition }, nodes) => {
-  if (nodes.every((node) => partition.has(node))) {
-    return { counter, partition };
-  } else {
-    const copy = new Map(partition);
-    for (const node of nodes) {
-      if (!copy.has(node)) {
-        copy.set(node, counter);
-        counter += 1;
-      }
-    }
-    return { counter, partition: copy };
-  }
+ * @param {Iterable<[N, Set<N>]>} entries
+ * @returns {(node: N) => Set<N>}
+*/
+export const compileCollectSuccessorSet = (entries) => {
+  const mapping = new Map(entries);
+  return (node) => mapping.get(node) ?? new Set();
 };
 
 /**
- * @param {Topology} topology
- * @param {Index} current
- * @param {Index} target
- * @returns {Index[]}
+ * @template N
+ * @param {Iterable<[N, N[]]>} entries
+ * @returns {(node: N) => N[]}
+*/
+export const compileCollectSuccessorArray = (entries) => {
+  const mapping = new Map(entries);
+  return (node) => mapping.get(node) ?? [];
+};
+
+/**
+ * @template N
+ * @param {Iterable<[N, Iterable<N>]>} entries
+ * @returns {(node: N) => Set<N>}
  */
-export const collectLoopBack = (topology, current, target) => {
+export const compileCollectPredecessorSet = (entries) => {
+  const predecessors = new Map();
+  for (const [origin, successors] of entries) {
+    for (const successor of successors) {
+      if (predecessors.has(successor)) {
+        predecessors.get(successor).add(origin);
+      } else {
+        predecessors.set(successor, new Set([origin]));
+      }
+    }
+  }
+  return (node) => predecessors.get(node) ?? new Set();
+};
+
+/**
+ * @template N
+ * @param {(node: N) => Iterable<N>} collectSuccessor
+ * @param {Iterable<N>} nodes
+ * @returns {Set<N>}
+ */
+export const collectReachable = (collectSuccessor, nodes) => {
+  const result = new Set();
+  const queue = [...nodes];
+  while (queue.length > 0) {
+    const node = /** @type {N} */ (queue.pop());
+    if (!result.has(node)) {
+      result.add(node);
+      queue.push(...collectSuccessor(node));
+    }
+  }
+  return result;
+};
+
+/**
+ * @template N
+ * @param {(node: N) => N[]} collectSuccessor
+ * @param {N} current
+ * @param {N} target
+ * @returns {N[]}
+ */
+export const collectCycle = (collectSuccessor, current, target) => {
   if (current === target) {
     return [current];
   } else {
-    const component = (topology.get(current) ?? []).flatMap((next) =>
-      collectLoopBack(topology, next, target)
+    const component = collectSuccessor(current).flatMap((next) =>
+      collectCycle(collectSuccessor, next, target)
     );
     if (component.length > 0) {
       return [current, ...component];
@@ -49,107 +81,38 @@ export const collectLoopBack = (topology, current, target) => {
 };
 
 /**
- * @param {Topology} topology
- * @param {(index: Index) => Index} collapse
- * @returns {Topology}
- */
-const collapseTopology = (topology, collapse) => {
-  const result = new Map();
-  for (const [origin, successors] of topology) {
-    const new_origin = collapse(origin);
-    const new_successor_array = successors.map(collapse);
-    if (result.has(new_origin)) {
-      result.get(new_origin).push(...new_successor_array);
-    } else {
-      result.set(new_origin, new_successor_array);
-    }
-  }
-  for (const [key, val] of result) {
-    result.set(key, [...new Set(val)]);
-  }
-  return result;
-};
-
-/**
  * @template N
- * @param {Partition<N>} partition
- * @param {(index: Index) => Index} collapse
- * @returns {Partition<N>}
+ * @param {(node: N) => N[]} collectSuccessor
+ * @param {Set<N>[]} components
+ * @param {N} target
+ * @returns {Set<N>[]}
  */
-const collapsePartition = (partition, collapse) =>
-  new Map([...partition].map(([node, index]) => [node, collapse(index)]));
-
-/**
- * @template N
- * @param {ComponentGraph<N>} graph
- * @param {N} node
- * @param {N[]} children
- * @returns {ComponentGraph<N>}
- */
-export const insertNode = (
-  { counter, partition, topology },
-  node,
-  children
-) => {
-  const { counter: new_counter, partition: new_partition } =
-    addAllPartitionNode({ counter, partition }, [node, ...children]);
-  const index = getMapStrict(new_partition, node);
-  if (topology.has(index)) {
-    throw new Error("Cannot change a node's topology");
-  } else {
-    const successors = children.map((successor) =>
-      getMapStrict(new_partition, successor)
-    );
-    const component = new Set(
-      successors.flatMap((successor) =>
-        collectLoopBack(topology, successor, index)
+export const addComponent = (collectSuccessor, components, target) => {
+  const { length } = components;
+  /** @type {(node: N) => number} */
+  const findComponentIndex = (node) =>
+    node === target
+      ? length
+      : components.findIndex((component) => component.has(node));
+  const arrays = components.map(toArray);
+  /** @type {(index: number) => number[]} */
+  const collectComponentSuccessor = (index) =>
+    index === -1
+      ? []
+      : [
+          ...new Set(
+            arrays[index].flatMap(collectSuccessor).map(findComponentIndex)
+          ),
+        ];
+  const collapse = new Set(
+    collectSuccessor(target)
+      .map(findComponentIndex)
+      .flatMap((index) =>
+        collectCycle(collectComponentSuccessor, index, length)
       )
-    );
-    if (component.size === 0) {
-      return {
-        counter: new_counter,
-        partition: new_partition,
-        topology: insertMap(topology, index, successors),
-      };
-    } else {
-      /** @type {(index: Index) => Index} */
-      const collapse = (index) => (component.has(index) ? new_counter : index);
-      return {
-        counter: new_counter + 1,
-        partition: collapsePartition(new_partition, collapse),
-        topology: collapseTopology(topology, collapse),
-      };
-    }
-  }
-};
-
-/**
- * @template N
- * @param {Partition<N>} partition
- * @returns {(index: Index) => N[]}
- */
-const compileGetComponent = (partition) => {
-  const trans = transposeMap(partition);
-  return (index) => getMapStrict(trans, index);
-};
-
-/**
- * @template N
- * @param {ComponentGraph<N>} graph
- * @param {(node: N) => boolean} predicate
- * @returns Node[][]
- */
-export const filterComponent = ({ partition, topology }, predicate) => {
-  const getComponent = compileGetComponent(partition);
-  const visited = [];
-  let breadth = [...topology]
-    .filter(([_index, successors]) => successors.length === 0)
-    .map(getFirst);
-  while (breadth.length > 0) {
-    visited.push(...breadth);
-    breadth = breadth
-      .flatMap((index) => getMapStrict(topology, index))
-      .filter((index) => getComponent(index).every(predicate));
-  }
-  return visited.map(getComponent);
+  );
+  return [
+    ...components.filter((_component, index) => !collapse.has(index)),
+    new Set([...[...collapse].flatMap((index) => arrays[index]), target]),
+  ];
 };

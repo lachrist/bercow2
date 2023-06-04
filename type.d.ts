@@ -94,7 +94,7 @@ type Node = {
 //   | { status: { type: "impact", stage: "validate", causes: Specifier[] }, specifier: Specifier, hash: Just<Hash>, dependencies: Just<Set<Specifier>> }
 //   | { status: { type: "done" }, specifier: Specifier, hash: Just<Hash>, dependencies: Just<Set<Specifier>> };
 
-type State = {nodes: Node[], graph: ComponentGraph<Specifier>}
+type State = {nodes: Node[], components: Set<Specifier>[]};
 
 type Cache = Map<Specifier, Node>;
 

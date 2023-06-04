@@ -66,11 +66,9 @@ export const fromMaybe = (recoverNothing, recoverJust, maybe) => {
   }
 };
 
-export const toMaybe = (value) => {};
-
 /**
  * @template X
- * @param {X[]}
+ * @param {X[]} xs
  * @param {(x: X) => boolean} predicate
  * @return {Maybe<X>}
  */
