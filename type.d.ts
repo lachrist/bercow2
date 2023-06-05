@@ -54,9 +54,9 @@ type Plugin = { link: Link; digest: Digest; validate: Validate };
 
 type Stage = "digest" | "link" | "validate";
 
-type DigestAction = {type: "digest", specifier: Specifier};
-type LinkAction = {type: "link", specifier: Specifier};
-type ValidateAction = {type: "validate", component: Component};
+type DigestAction = {stage: "digest", specifier: Specifier};
+type LinkAction = {stage: "link", specifier: Specifier, hash: Hash};
+type ValidateAction = {stage: "validate", specifier: Specifier, hash: Hash};
 
 type Action = DigestAction | LinkAction | ValidateAction;
 
@@ -93,17 +93,21 @@ type Node = {
 //   | { status: { type: "impact", stage: "validate", causes: Specifier[] }, specifier: Specifier, hash: Just<Hash>, dependencies: Just<Set<Specifier>> }
 //   | { status: { type: "done" }, specifier: Specifier, hash: Just<Hash>, dependencies: Just<Set<Specifier>> };
 
-type Component = Set<Specifier>;
+// type Component = Set<Specifier>;
 
 type Graph = Map<Specifier, Node>;
 
-type State = {graph: Graph, components: Component[]};
+// type State = {graph: Graph, components: Component[]};
 
-type Input = {state: State, specifier: Specifier, result: Result};
+type Input = {graph: Graph, specifier: Specifier, result: Result};
 
-type Output = Either<Message, {state: State, actions: Action[]}>;
+type Output = Either<Message, {graph: Graph, actions: Action[]}>;
 
 type step = (input: Input) => Output;
+
+type LinkCache = Map<Specifier, {hash: Hash, dependencies: Set<Specifier>}>;
+
+type ValidateCache = Map<Specifier, {hash: Hash, result: ValidateResult}>;
 
 // type Node =
 //   | { type: "todo" }

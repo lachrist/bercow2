@@ -1,11 +1,26 @@
+import { createHash } from "crypto";
 import {
-  addComponent,
-  collectReachable,
-  compileCollectSuccessor,
-} from "./graph.mjs";
-import { bindRight, fromEither, makeLeft, makeRight } from "./either.mjs";
-import { fromMaybe, makeJust, nothing } from "./maybe.mjs";
-import { flip } from "./pair.mjs";
+  bindRight,
+  fromEither,
+  makeLeft,
+  makeRight,
+  mapRight,
+} from "./either.mjs";
+import { fromJust, fromMaybe, makeJust, mapMaybe, nothing, sequenceMaybe } from "./maybe.mjs";
+import { getFirst, getSecond } from "./pair.mjs";
+import { identity } from "./util.mjs";
+
+/** @typedef {[Specifier, Node]} NodeEntry */
+
+/** @type {(string1: string, string2: string) => number} */
+const compareString = (string1, string2) => string1.localeCompare(string2);
+
+/** @type {(input: String) => Hash} */
+const digest = (string) => {
+  const hash = createHash("sha256");
+  hash.update(string);
+  return hash.digest("hex");
+};
 
 /** @type {(node: Node, result: Result) => Either<Message, Node>} */
 const updateNode = (
@@ -77,65 +92,11 @@ const updateNode = (
   }
 };
 
-/** @type {(node: Node, cause: Specifier) => Node} */
-const impactNode = (node, cause) => {
-  const { status } = node;
-  if (status.type === "success" && status.stage === "link") {
-    return {
-      ...node,
-      status: {
-        type: "impact",
-        causes: new Set([cause]),
-      },
-    };
-  } else if (status.type === "impact") {
-    return {
-      ...node,
-      status: {
-        type: "impact",
-        causes: new Set([...status.causes, cause]),
-      },
-    };
-  } else {
-    throw new Error("only success link graph can be impacted");
-  }
-};
+/** @type {(node: Node) => Specifier[]} */
+const collectNodeDependency = ({ dependencies }) => [...dependencies];
 
-// /** @type {(node: Node) => [Specifier, Set<Specifier>]} */
-// const toNodeTopologySet = (node) => [
-//   node.specifier,
-//   collectNodeDependencySet(node),
-// ];
-
-// /** @type {(node: Node) => [Specifier, Specifier[]]} */
-// const toNodeTopologyArray = (node) => [
-//   node.specifier,
-//   collectNodeDependencyArray(node),
-// ];
-
-/** @type {(entry: [Specifier, Node]) => [Specifier, Specifier][]} */
-const collectNodeEntryEdge = ([specifier, { dependencies }]) =>
-  [...dependencies].map((dependency) => [specifier, dependency]);
-
-/** @type {(graph: Graph, cause: Specifier) => Graph} */
-const propagateFailure = (graph, cause) =>
-  new Map([
-    ...graph,
-    ...[
-      ...collectReachable(
-        compileCollectSuccessor(
-          [...graph].flatMap(collectNodeEntryEdge).map(flip)
-        ),
-        new Set([cause])
-      ),
-    ].map(
-      (specifier) =>
-        /** @type {NodeEntry} */ ([
-          specifier,
-          impactNode(graph.get(specifier) ?? TODO_NODE, cause),
-        ])
-    ),
-  ]);
+/** @type {(specifier: Specifier) => NodeEntry} */
+const makeTodoNodeEntry = (specifier) => [specifier, TODO_NODE];
 
 /** @type {Node} */
 const TODO_NODE = {
@@ -144,192 +105,239 @@ const TODO_NODE = {
   dependencies: new Set(),
 };
 
-/** @typedef {[Specifier, Node]} NodeEntry */
+/** @type {(graph: Graph) => graph} */
+const fillGraph = (graph) =>
+  new Map([
+    ...graph,
+    ...[...graph.values()]
+      .flatMap(collectNodeDependency)
+      .filter((dependency) => !graph.has(dependency))
+      .map(makeTodoNodeEntry),
+  ]);
 
-/** @type {(graph: Graph, component: Set<Specifier>) => boolean} */
-const isComponentReady = (graph, component) =>
-  [...component].every((specifier) => {
-    if (graph.has(specifier)) {
-      const node = /** @type {Node} */ (graph.get(specifier));
-      return (
-        node.status.type === "done" ||
-        (component.has(specifier) &&
-          node.status.type === "success" &&
-          node.status.stage === "link")
+/** @type {(graph: Graph) => graph} */
+export const propagateFailure = (graph) => {
+  const entries = [...graph].flatMap((entry) =>
+    propagateFailureNodeEntry(entry, graph)
+  );
+  if (entries.length === 0) {
+    return graph;
+  } else {
+    return propagateFailure(new Map([...graph, ...entries]));
+  }
+};
+
+/** @type {(entry: NodeEntry, graph: Graph) => NodeEntry[]} */
+const propagateFailureNodeEntry = ([specifier, node], graph) => {
+  if (node.status.type === "failure") {
+    return [];
+  } else {
+    const causes = new Set(
+      [...node.dependencies].flatMap((dependency) =>
+        graph.has(dependency)
+          ? collectNodeEntryCause([
+              dependency,
+              /** @type {Node} */ (graph.get(dependency)),
+            ])
+          : []
+      )
+    );
+    if (
+      node.status.type !== "impact" ||
+      causes.size > node.status.causes.size
+    ) {
+      return [[specifier, { ...node, status: { type: "impact", causes } }]];
+    } else {
+      return [];
+    }
+  }
+};
+
+/** @type {(entry: NodeEntry) => Specifier[]} */
+export const collectNodeEntryCause = ([specifier, node]) => {
+  if (node.status.type === "failure") {
+    return [specifier];
+  } else if (node.status.type === "impact") {
+    return [...node.status.causes];
+  } else {
+    return [];
+  }
+};
+
+/**
+ * @type {(
+ *   specifier: Specifier,
+ *   visited: Set<Specifier>,
+ *   graph: Graph
+ * ) => boolean}
+ */
+export const canNodeBeValidated = (specifier, visited, graph) => {
+  if (visited.has(specifier)) {
+    return true;
+  } else if (graph.has(specifier)) {
+    const node = /** @type {Node} */ (graph.get(specifier));
+    if (
+      node.status.type === "done" ||
+      (node.status.type === "success" && node.status.stage === "validate")
+    ) {
+      return true;
+    } else if (node.status.type === "success" && node.status.stage === "link") {
+      const new_visited = new Set([...visited, specifier]);
+      return [...node.dependencies].every((dependency) =>
+        canNodeBeValidated(dependency, new_visited, graph)
       );
     } else {
       return false;
     }
-  });
+  } else {
+    return false;
+  }
+};
 
-/** @type {(state: State, entry: NodeEntry) => Output} */
-const stepNode = ({ graph, components }, [specifier, node]) => {
-  if (node.status.type === "failure") {
-    return makeRight({
-      state: {
-        graph: new Map([
-          ...propagateFailure(graph, specifier),
-          [specifier, node],
-        ]),
-        components,
-      },
-      actions: [],
-    });
+/** @type {(graph: Graph) => { graph: Graph; actions: Action[] }} */
+const scheduleAction = (graph) => {
+  const pairs = [...graph].map((entry) =>
+    scheduleNodeEntryAction(entry, graph)
+  );
+  return {
+    graph: new Map(pairs.map(getFirst)),
+    actions: pairs.flatMap(getSecond),
+  };
+};
+
+/** @type {(specifier: Specifier, graph: Graph) => Set<Specifier>} */
+export const collectDependencyDeep = (specifier, graph) => {
+  const visited = new Set();
+  const specifiers = [specifier];
+  while (specifiers.length > 0) {
+    const specifier = /** @type {Specifier} */ (specifiers.pop());
+    if (!visited.has(specifier)) {
+      visited.add(specifier);
+      if (graph.has(specifier)) {
+        specifiers.push(... /** @type {Node} */ (graph.get(specifier)).dependencies);
+      }
+    }
+  }
+  return visited;
+};
+
+/** @type {(specifier: Specifier, graph: Graph) => Maybe<Hash>} */
+const hashDeep = (specifier, graph) => mapMaybe(
+  digest,
+  mapMaybe(
+    JSON.stringify,
+    sequenceMaybe(
+      [... collectDependencyDeep(specifier, graph)]
+        .sort(compareString)
+        .map((specifier) => graph.has(specifier)
+          ? mapMaybe(
+            (hash) => [specifier, hash],
+            /** @type {Node} */ (graph.get(specifier)).hash,
+          )
+          : nothing
+        )
+    )
+  ),
+);
+
+/** @type {(entry: NodeEntry, graph: Graph) => [NodeEntry, Action[]]} */
+export const scheduleNodeEntryAction = ([specifier, node], graph) => {
+  if (node.status.type === "todo") {
+    return [
+      [specifier, { ...node, status: { type: "pending", stage: "digest" } }],
+      [
+        {
+          stage: "digest",
+          specifier,
+        },
+      ],
+    ];
   } else if (node.status.type === "success") {
     if (node.status.stage === "digest") {
-      return makeRight({
-        state: {
-          graph: new Map([
-            ...graph,
-            [
-              specifier,
-              {
-                ...node,
-                status: { type: "pending", stage: "link" },
-              },
-            ],
-          ]),
-          components,
-        },
-        actions: [
+      return [
+        [specifier, { ...node, status: { type: "pending", stage: "link" } }],
+        [
           {
-            type: "link",
+            stage: "link",
             specifier,
+            hash: fromJust(node.hash),
           },
         ],
-      });
+      ];
     } else if (node.status.stage === "link") {
-      const new_component_array = addComponent(
-        (specifier) =>
-          graph.has(specifier)
-            ? /** @type {Node} */ (graph.get(specifier)).dependencies
-            : new Set(),
-        components,
-        specifier
-      );
-      const causes = new Set(
-        [...node.dependencies].flatMap((specifier) => {
-          if (graph.has(specifier)) {
-            const node = /** @type {Node} */ (graph.get(specifier));
-            if (node.status.type === "failure") {
-              return [specifier];
-            } else if (node.status.type === "impact") {
-              return [...node.status.causes];
-            } else {
-              return [];
-            }
-          } else {
-            return [];
-          }
-        })
-      );
-      if (causes.size > 0) {
-        return makeRight({
-          state: {
-            graph: new Map([
-              ...graph,
-              [
-                specifier,
-                {
-                  ...node,
-                  status: {
-                    type: "impact",
-                    causes,
-                  },
+      if (canNodeBeValidated(specifier, new Set(), graph)) {
+        return [
+          [
+            specifier,
+            { ...node, status: { type: "pending", stage: "validate" } },
+          ],
+          [
+            {
+              stage: "validate",
+              specifier,
+              hash: fromMaybe(
+                () => {
+                  throw new Error("when a node can be validated it should be deeply hashable");
                 },
-              ],
-            ]),
-            components: new_component_array,
-          },
-          actions: [],
-        });
-      } else {
-        const component = /** @type {Set<Specifier>} */ (
-          new_component_array.find((component) => component.has(specifier))
-        );
-        if (isComponentReady(graph, component)) {
-          return makeRight({
-            state: {
-              graph: new Map(
-                [...graph].map(([specifier, node]) => [
-                  specifier,
-                  component.has(specifier)
-                    ? {
-                        ...node,
-                        status: { type: "pending", stage: "validate" },
-                      }
-                    : node,
-                ])
+                identity,
+                hashDeep(specifier, graph),
               ),
-              components: new_component_array,
             },
-            actions: [{ type: "validate", component }],
-          });
-        } else {
-          return makeRight({
-            state: {
-              graph: new Map([
-                ...graph,
-                [
-                  specifier,
-                  {
-                    ...node,
-                    status: { type: "success", stage: "link" },
-                  },
-                ],
-              ]),
-              components: new_component_array,
-            },
-            actions: [],
-          });
-        }
+          ],
+        ];
+      } else {
+        return [[specifier, node], []];
       }
     } else if (node.status.stage === "validate") {
-      const new_graph = new Map([
-        ...graph,
-        [specifier, { ...node, status: { type: "done" } }],
-      ]);
-      const ready_component_array = components.filter((component) =>
-        isComponentReady(new_graph, component)
-      );
-      const ready_specifier_array = new Set(
-        ready_component_array.flatMap((component) => [...component])
-      );
-      return makeRight({
-        state: {
-          graph: new Map(
-            [...new_graph].map(([specifier, node]) => [
-              specifier,
-              ready_specifier_array.has(specifier)
-                ? { ...node, status: { type: "pending", stage: "validate" } }
-                : node,
-            ])
-          ),
-          components,
-        },
-        actions: ready_component_array.map((component) => ({
-          type: "validate",
-          component,
-        })),
-      });
+      return [[specifier, { ...node, status: { type: "done" } }], []];
     } else {
-      throw new Error("unexpected stage type after success");
+      throw new Error("invalid stage");
     }
   } else {
-    throw new Error("unexpected status type after result");
+    return [[specifier, node], []];
+  }
+};
+
+/**
+ * @type {(
+ *   graph: Graph,
+ *   status: Status
+ * ) => { graph: Graph; actions: Action[] }}
+ */
+const processNodeStatus = (graph, status) => {
+  if (status.type === "failure") {
+    return {
+      graph: propagateFailure(graph),
+      actions: [],
+    };
+  } else if (status.type === "success") {
+    if (status.stage === "digest") {
+      return scheduleAction(graph);
+    } else if (status.stage === "link") {
+      return scheduleAction(propagateFailure(fillGraph(graph)));
+    } else if (status.stage === "validate") {
+      return scheduleAction(graph);
+    } else {
+      throw new Error("invalid stage");
+    }
+  } else {
+    throw new Error("unexpected new node status type");
   }
 };
 
 /** @type {step} */
-export const step = ({ state: { graph, components }, specifier, result }) =>
+export const step = ({ graph, specifier, result }) =>
   bindRight(
-    fromMaybe(
-      () => makeLeft(`missing node specifier ${specifier}`),
-      makeRight,
-      graph.has(specifier) ? makeJust(graph.get(specifier)) : nothing
-    ),
+    graph.has(specifier)
+      ? makeRight(graph.get(specifier))
+      : makeLeft(`missing node specifier ${specifier}`),
     (node) =>
-      bindRight(updateNode(node, result), (node) =>
-        stepNode({ graph, components }, [specifier, node])
+      mapRight(
+        (node) =>
+          processNodeStatus(
+            new Map([...graph, [specifier, node]]),
+            node.status
+          ),
+        updateNode(node, result)
       )
   );

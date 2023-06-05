@@ -52,6 +52,15 @@ export const mapMaybe = (transform, maybe) => {
 export const concatMaybe = (maybes) => maybes.filter(isJust).map(fromJust);
 
 /**
+ * @template A
+ * @param {Maybe<A>[]} maybes
+ * @return {Maybe <A[]>}
+*/
+export const sequenceMaybe = (maybes) => maybes.some(isNothing)
+  ? nothing
+  : makeJust(maybes.map(fromJust));
+
+/**
  * @template A, B
  * @param {() => B} recoverNothing
  * @param {(a: A) => B} recoverJust
