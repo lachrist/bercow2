@@ -33,6 +33,22 @@ type ComponentGraph<N> = {
 };
 
 ////////////
+// Stream //
+////////////
+
+type Stream<X> = {
+  pendings: ((maybe: Maybe<X>) => void)[];
+  queue: X[];
+  done: boolean;
+};
+
+///////////
+// State //
+///////////
+
+type State<X> = { value: X };
+
+////////////
 // Domain //
 ////////////
 

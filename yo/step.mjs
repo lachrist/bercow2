@@ -6,7 +6,14 @@ import {
   makeRight,
   mapRight,
 } from "./either.mjs";
-import { fromJust, fromMaybe, makeJust, mapMaybe, nothing, sequenceMaybe } from "./maybe.mjs";
+import {
+  fromJust,
+  fromMaybe,
+  makeJust,
+  mapMaybe,
+  nothing,
+  sequenceMaybe,
+} from "./maybe.mjs";
 import { getFirst, getSecond } from "./pair.mjs";
 import { identity } from "./util.mjs";
 
@@ -214,7 +221,9 @@ export const collectDependencyDeep = (specifier, graph) => {
     if (!visited.has(specifier)) {
       visited.add(specifier);
       if (graph.has(specifier)) {
-        specifiers.push(... /** @type {Node} */ (graph.get(specifier)).dependencies);
+        specifiers.push(
+          .../** @type {Node} */ (graph.get(specifier)).dependencies
+        );
       }
     }
   }
@@ -222,23 +231,25 @@ export const collectDependencyDeep = (specifier, graph) => {
 };
 
 /** @type {(specifier: Specifier, graph: Graph) => Maybe<Hash>} */
-const hashDeep = (specifier, graph) => mapMaybe(
-  digest,
+const hashDeep = (specifier, graph) =>
   mapMaybe(
-    JSON.stringify,
-    sequenceMaybe(
-      [... collectDependencyDeep(specifier, graph)]
-        .sort(compareString)
-        .map((specifier) => graph.has(specifier)
-          ? mapMaybe(
-            (hash) => [specifier, hash],
-            /** @type {Node} */ (graph.get(specifier)).hash,
+    digest,
+    mapMaybe(
+      JSON.stringify,
+      sequenceMaybe(
+        [...collectDependencyDeep(specifier, graph)]
+          .sort(compareString)
+          .map((specifier) =>
+            graph.has(specifier)
+              ? mapMaybe(
+                  (hash) => [specifier, hash],
+                  /** @type {Node} */ (graph.get(specifier)).hash
+                )
+              : nothing
           )
-          : nothing
-        )
+      )
     )
-  ),
-);
+  );
 
 /** @type {(entry: NodeEntry, graph: Graph) => [NodeEntry, Action[]]} */
 export const scheduleNodeEntryAction = ([specifier, node], graph) => {
@@ -277,10 +288,12 @@ export const scheduleNodeEntryAction = ([specifier, node], graph) => {
               specifier,
               hash: fromMaybe(
                 () => {
-                  throw new Error("when a node can be validated it should be deeply hashable");
+                  throw new Error(
+                    "when a node can be validated it should be deeply hashable"
+                  );
                 },
                 identity,
-                hashDeep(specifier, graph),
+                hashDeep(specifier, graph)
               ),
             },
           ],
@@ -325,6 +338,10 @@ const processNodeStatus = (graph, status) => {
   }
 };
 
+/** @type {(specifiers: Set<Specifier>) => Graph} */
+export const initialize = (specifiers) =>
+  new Map([...specifiers].map(makeTodoNodeEntry));
+
 /** @type {step} */
 export const step = ({ graph, specifier, result }) =>
   bindRight(
@@ -341,3 +358,10 @@ export const step = ({ graph, specifier, result }) =>
         updateNode(node, result)
       )
   );
+
+/** @type {(node: Node) => boolean} */
+const isNodeDone = ({ status: { type } }) =>
+  type === "done" || type === "failure" || type === "impact";
+
+/** @type {(graph: Graph) => boolean} */
+export const isDone = (graph) => [...graph.values()].every(isNodeDone);
