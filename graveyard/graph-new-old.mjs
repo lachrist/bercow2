@@ -1,4 +1,4 @@
-import { toArray } from "./collection.mjs";
+import { toArray } from "./util/collection.mjs";
 
 /**
  * @template N

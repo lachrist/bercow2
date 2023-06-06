@@ -33,7 +33,7 @@ type ComponentGraph<N> = {
 };
 
 ////////////
-// Stream //
+// Impure //
 ////////////
 
 type Stream<X> = {
@@ -42,11 +42,9 @@ type Stream<X> = {
   done: boolean;
 };
 
-///////////
-// State //
-///////////
-
 type State<X> = { value: X };
+
+type MutMap<K, V> = { map: Map<K, V> };
 
 ////////////
 // Domain //
