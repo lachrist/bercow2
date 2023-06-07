@@ -11,6 +11,10 @@
     "prettier-plugin-jsdoc": "^0.4.2",
     "typescript": "^5.0.4"
   },
+  "scripts": {
+    "lint": "eslint --ext .mjs",
+    "format": "prettier --w ."
+  },
   "dependencies": {
     "@babel/parser": "^7.21.9"
   }

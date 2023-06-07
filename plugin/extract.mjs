@@ -1,4 +1,3 @@
-
 // @ts-ignore
 import { parse } from "@babel/parser";
 import { readFile } from "node:fs/promises";

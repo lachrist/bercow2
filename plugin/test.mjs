@@ -3,7 +3,7 @@ import { spawn } from "child_process";
 /** @type {(specifier: String) => string | Error} */
 const getTest = (specifier) => {
   if (specifier.endsWith(".mjs")) {
-    return `${specifier.substring(0, specifier.length - 4)}.test.mjs`
+    return `${specifier.substring(0, specifier.length - 4)}.test.mjs`;
   } else {
     return new Error("invalid specifier extension");
   }

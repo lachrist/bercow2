@@ -108,7 +108,7 @@ type Status =
   | { type: "pending"; stage: Stage }
   | { type: "failure"; stage: Stage; error: Error }
   | { type: "success"; stage: Stage }
-  | { type: "done", skipped: boolean };
+  | { type: "done"; skipped: boolean };
 
 type Node = {
   status: Status;
