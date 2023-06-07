@@ -59,13 +59,13 @@ type ShallowHash = string;
 type DeepHash = string;
 
 type DigestPlugin = (specifier: Specifier) => Promise<Error | Hash>;
-type LintPlugin = (specifier: Specifier) => Promise<Error | null>;
+type LintPlugin = (specifier: Specifier) => Promise<Error | undefined>;
 type ExtractPlugin = (specifier: Specifier) => Promise<Error | Set<Target>>;
 type ResolvePlugin = (
   target: Target,
   origin: Specifier
 ) => Promise<Error | Set<Specifier>>;
-type TestPlugin = (specifier: Specifier) => Promise<Error | null>;
+type TestPlugin = (specifier: Specifier) => Promise<Error | undefined>;
 
 type Plugin = {
   digest: DigestPlugin;

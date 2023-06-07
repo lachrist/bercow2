@@ -2,8 +2,10 @@
   "name": "bercow2",
   "version": "0.0.0",
   "devDependencies": {
+    "@types/eslint": "^8.40.0",
     "@types/node": "^20.2.3",
-    "c8": "^7.13.0",
+    "@types/prettier": "^2.7.3",
+    "c8": "^7.14.0",
     "eslint": "^8.41.0",
     "prettier": "^2.8.8",
     "prettier-plugin-jsdoc": "^0.4.2",
