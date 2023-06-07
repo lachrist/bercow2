@@ -2,6 +2,8 @@
 // Prelude //
 /////////////
 
+type json = null | boolean | number | string | json[] | { [key: string]: json };
+
 type Nil = null;
 type Cons<A> = { car: A; cdr: List<A> };
 type List<A> = Nil | Cons<A>;
@@ -53,42 +55,59 @@ type MutMap<K, V> = { map: Map<K, V> };
 type Specifier = string;
 type Target = string;
 type Hash = string;
-type Message = string;
+type ShallowHash = string;
+type DeepHash = string;
+type Failure = string;
 
-type DigestResult = Either<Message, Hash>;
-type Digest = (specifier: Specifier) => Promise<DigestResult>;
+type LintPlugin = (specifier: Specifier) => Promise<Maybe<Failure>>;
+type ParsePlugin = (
+  specifier: Specifier
+) => Promise<Either<Failure, Set<Target>>>;
+type ResolvePlugin = (
+  target: Target,
+  origin: Specifier
+) => Promise<Either<Failure, Set<Specifier>>>;
+type TestPlugin = (specifier: Specifier) => Promise<Maybe<Failure>>;
 
-type LinkResult = Either<Message, Set<Specifier>>;
-type Link = (specifier: Specifier) => Promise<LinkResult>;
+type Plugin = {
+  lint: LintPlugin;
+  parse: ParsePlugin;
+  resolve: ResolvePlugin;
+  test: TestPlugin;
+};
 
-type ValidateResult = Either<Message, null>;
-type Validate = (specifier: Specifier) => Promise<ValidateResult>;
+type LintResult = Either<Failure, ShallowHash>;
+type Lint = (specifier: Specifier) => Promise<LintResult>;
 
-type Plugin = { link: Link; digest: Digest; validate: Validate };
+type LinkResult = Either<Failure, Set<Specifier>>;
+type Link = (specifier: Specifier, hash: ShallowHash) => Promise<LinkResult>;
+
+type TestResult = Maybe<Failure>;
+type Test = (specifier: Specifier, hash: DeepHash) => Promise<TestResult>;
 
 type Stage = "digest" | "link" | "validate";
 
-type DigestAction = {stage: "digest", specifier: Specifier};
-type LinkAction = {stage: "link", specifier: Specifier, hash: Hash};
-type ValidateAction = {stage: "validate", specifier: Specifier, hash: Hash};
+type LintAction = { type: "lint"; specifier: Specifier };
+type LinkAction = { type: "link"; specifier: Specifier; hash: ShallowHash };
+type TestAction = { type: "test"; specifier: Specifier; hash: DeepHash };
 
-type Action = DigestAction | LinkAction | ValidateAction;
+type Action = LintAction | LinkAction | TestAction;
 
 type Result =
-  | { stage: "digest", inner: DigestResult }
-  | { stage: "link", inner: LinkResult }
-  | { stage: "validate", inner: ValidateResult };
+  | { type: "lint"; inner: LintResult }
+  | { type: "link"; inner: LinkResult }
+  | { type: "test"; inner: TestResult };
 
 type Status =
   | { type: "todo" }
-  | { type: "failure", stage: Stage, message: Message }
-  | { type: "success", stage: Stage }
-  | { type: "pending", stage: Stage }
-  | { type: "impact", causes: Set<Specifier> }
+  | { type: "failure"; stage: Stage; message: Failure }
+  | { type: "success"; stage: Stage }
+  | { type: "pending"; stage: Stage }
+  | { type: "impact"; causes: Set<Specifier> }
   | { type: "done" };
 
 type Node = {
-  status: Status,
+  status: Status;
   hash: Maybe<Hash>;
   dependencies: Set<Specifier>;
 };
@@ -113,15 +132,15 @@ type Graph = Map<Specifier, Node>;
 
 // type State = {graph: Graph, components: Component[]};
 
-type Input = {graph: Graph, specifier: Specifier, result: Result};
+// type Input = {graph: Graph, specifier: Specifier, result: Result};
 
-type Output = Either<Message, {graph: Graph, actions: Action[]}>;
+// type Output = Either<Failure, {graph: Graph, actions: Action[]}>;
 
-type step = (input: Input) => Output;
+// type step = (input: Input) => Output;
 
-type LinkCache = Map<Specifier, {hash: Hash, dependencies: Set<Specifier>}>;
+// type LinkCache = Map<Specifier, {hash: Hash, dependencies: Set<Specifier>}>;
 
-type ValidateCache = Map<Specifier, {hash: Hash, result: ValidateResult}>;
+// type ValidateCache = Map<Specifier, {hash: Hash, result: ValidateResult}>;
 
 // type Node =
 //   | { type: "todo" }
