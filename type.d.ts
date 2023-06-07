@@ -57,35 +57,40 @@ type Target = string;
 type Hash = string;
 type ShallowHash = string;
 type DeepHash = string;
-type Failure = string;
 
-type LintPlugin = (specifier: Specifier) => Promise<Maybe<Failure>>;
-type ParsePlugin = (
-  specifier: Specifier
-) => Promise<Either<Failure, Set<Target>>>;
+type DigestPlugin = (specifier: Specifier) => Promise<Error | Hash>;
+type LintPlugin = (specifier: Specifier) => Promise<Error | null>;
+type ExtractPlugin = (specifier: Specifier) => Promise<Error | Set<Target>>;
 type ResolvePlugin = (
   target: Target,
   origin: Specifier
-) => Promise<Either<Failure, Set<Specifier>>>;
-type TestPlugin = (specifier: Specifier) => Promise<Maybe<Failure>>;
+) => Promise<Error | Set<Specifier>>;
+type TestPlugin = (specifier: Specifier) => Promise<Error | null>;
 
 type Plugin = {
+  digest: DigestPlugin;
   lint: LintPlugin;
-  parse: ParsePlugin;
+  extract: ExtractPlugin;
   resolve: ResolvePlugin;
   test: TestPlugin;
 };
 
-type LintResult = Either<Failure, ShallowHash>;
+// type CookedPlugin = {
+//   lint: Lint,
+//   link: Link,
+//   test: Test
+// };
+
+type LintResult = Either<Error, ShallowHash>;
 type Lint = (specifier: Specifier) => Promise<LintResult>;
 
-type LinkResult = Either<Failure, Set<Specifier>>;
+type LinkResult = Either<Error, Set<Specifier>>;
 type Link = (specifier: Specifier, hash: ShallowHash) => Promise<LinkResult>;
 
-type TestResult = Maybe<Failure>;
+type TestResult = Maybe<Error>;
 type Test = (specifier: Specifier, hash: DeepHash) => Promise<TestResult>;
 
-type Stage = "digest" | "link" | "validate";
+type Stage = "lint" | "link" | "test";
 
 type LintAction = { type: "lint"; specifier: Specifier };
 type LinkAction = { type: "link"; specifier: Specifier; hash: ShallowHash };
@@ -100,11 +105,10 @@ type Result =
 
 type Status =
   | { type: "todo" }
-  | { type: "failure"; stage: Stage; message: Failure }
-  | { type: "success"; stage: Stage }
   | { type: "pending"; stage: Stage }
-  | { type: "impact"; causes: Set<Specifier> }
-  | { type: "done" };
+  | { type: "failure"; stage: Stage; error: Error }
+  | { type: "success"; stage: Stage }
+  | { type: "done", skipped: boolean };
 
 type Node = {
   status: Status;
