@@ -2,6 +2,7 @@
   "name": "bercow2",
   "version": "0.0.0",
   "devDependencies": {
+    "@babel/parser": "^7.22.4",
     "@types/eslint": "^8.40.0",
     "@types/node": "^20.2.3",
     "@types/prettier": "^2.7.3",
@@ -12,10 +13,7 @@
     "typescript": "^5.0.4"
   },
   "scripts": {
-    "lint": "eslint --ext .mjs",
-    "format": "prettier --w ."
-  },
-  "dependencies": {
-    "@babel/parser": "^7.21.9"
+    "lint": "npx eslint '**/*.mjs'",
+    "format": "npx prettier --w ."
   }
 }
