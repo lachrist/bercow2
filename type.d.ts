@@ -58,14 +58,14 @@ type Hash = string;
 type ShallowHash = string;
 type DeepHash = string;
 
-type DigestPlugin = (specifier: Specifier) => Promise<Error | Hash>;
-type LintPlugin = (specifier: Specifier) => Promise<Error | undefined>;
-type ExtractPlugin = (specifier: Specifier) => Promise<Error | Set<Target>>;
+type DigestPlugin = (specifier: Specifier) => Promise<Hash>;
+type LintPlugin = (specifier: Specifier) => Promise<void>;
+type ExtractPlugin = (specifier: Specifier) => Promise<Set<Target>>;
 type ResolvePlugin = (
   target: Target,
   origin: Specifier
-) => Promise<Error | Set<Specifier>>;
-type TestPlugin = (specifier: Specifier) => Promise<Error | undefined>;
+) => Promise<Set<Specifier>>;
+type TestPlugin = (specifier: Specifier) => Promise<void>;
 
 type Plugin = {
   digest: DigestPlugin;

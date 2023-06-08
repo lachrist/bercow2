@@ -7,27 +7,18 @@ import test from "./plugin/test.mjs";
 import bercow from "./lib/index.mjs";
 import { toDotFormat } from "./lib/graph.mjs";
 
-console.log("yo");
+Error.stackTraceLimit = Infinity;
 
-const either = await bercow(
-  new Set([import.meta.url]),
-  {
-    plugin: {
-      digest,
-      lint,
-      extract,
-      resolve,
-      test,
-    },
-    concurrency: "50%",
-    cache: new URL(".bercow.json", import.meta.url),
-  }
-);
+const graph = await bercow(new Set([import.meta.url]), {
+  plugin: {
+    digest,
+    lint,
+    extract,
+    resolve,
+    test,
+  },
+  concurrency: "50%",
+  cache: new URL(".bercow.json", import.meta.url),
+});
 
-console.log("foo");
-
-if (either instanceof Error) {
-  throw either;
-}
-
-stdout.write(toDotFormat(either), "utf8");
+stdout.write(toDotFormat(graph), "utf8");

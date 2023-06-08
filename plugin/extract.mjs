@@ -1,15 +1,15 @@
+import { readFile } from "node:fs/promises";
 // @ts-ignore
 import { parse } from "@babel/parser";
-import { readFile } from "node:fs/promises";
-import { catchError, catchErrorAsync } from "./util.mjs";
 
 /** @typedef {any} Node */
 
 /** @type {(node: Node) => Target[]} */
 const collectTarget = (node) => {
-  if (node.type === "ImportStatement") {
+  // console.log(node);
+  if (node.type === "ImportDeclaration") {
     return [node.source.value];
-  } else if (node.type === "ExportNamedDeclaration") {
+  } else if (node.type === "ExportNamedDeclaration" && node.source !== null) {
     return [node.source.value];
   } else if (node.type === "ExportAllDeclaration") {
     return [node.source.value];
@@ -20,15 +20,12 @@ const collectTarget = (node) => {
 
 /** @type {ExtractPlugin} */
 export default async (specifier) => {
-  const content = await catchErrorAsync(readFile(new URL(specifier), "utf8"));
-  if (content instanceof Error) {
-    return content;
-  }
-  const node = catchError(() =>
-    parse(content, { sourceType: "module", ecmaVersion: 2022 })
+  const node = parse(await readFile(new URL(specifier), "utf8"), {
+    sourceType: "module",
+    ecmaVersion: 2022,
+  });
+  // console.dir(node);
+  return new Set(
+    node.program.body.flatMap(collectTarget)
   );
-  if (node instanceof Error) {
-    return node;
-  }
-  return new Set(node.program.nodes.flatMap(collectTarget));
 };
