@@ -8,12 +8,12 @@ type Nil = null;
 type Cons<A> = { car: A; cdr: List<A> };
 type List<A> = Nil | Cons<A>;
 
-type Left<A> = { type: "left"; left: A };
-type Right<B> = { type: "right"; right: B };
+type Left<A> = { left: A };
+type Right<B> = {right: B };
 type Either<A, B> = Left<A> | Right<B>;
 
 type Nothing = null;
-type Just<A> = { value: A };
+type Just<A> = { just: A };
 type Maybe<A> = Nothing | Just<A>;
 
 type Pair<A, B> = [A, B];
@@ -102,6 +102,8 @@ type Result =
   | { type: "lint"; inner: LintResult }
   | { type: "link"; inner: LinkResult }
   | { type: "test"; inner: TestResult };
+
+type Outcome = { specifier: Specifier, result: Result };
 
 type Status =
   | { type: "todo" }
