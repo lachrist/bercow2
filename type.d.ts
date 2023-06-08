@@ -29,6 +29,7 @@ type Specifier = string;
 type Target = string;
 type Hash = string;
 type DeepHash = string;
+type Report = string;
 
 type DigestPlugin = (specifier: Specifier) => Promise<Hash>;
 type ExtractPlugin = (specifier: Specifier) => Promise<Set<Target>>;
@@ -36,8 +37,8 @@ type ResolvePlugin = (
   target: Target,
   origin: Specifier
 ) => Promise<Set<Specifier>>;
-type LintPlugin = (specifier: Specifier) => Promise<void>;
-type TestPlugin = (specifier: Specifier) => Promise<void>;
+type LintPlugin = (specifier: Specifier) => Promise<null | Report>;
+type TestPlugin = (specifier: Specifier) => Promise<null | Report>;
 
 type Plugin = {
   digest: DigestPlugin;
@@ -58,9 +59,10 @@ type Action =
 
 type Result =
   | { type: "success"; stage: "link"; hash: Hash; dependencies: Set<Specifier> }
-  | { type: "failure"; stage: "link"; error: Error }
+  | { type: "errored"; stage: "link"; error: Error }
   | { type: "success"; stage: "test" }
-  | { type: "failure"; stage: "test"; error: Error };
+  | { type: "errored"; stage: "test"; error: Error }
+  | { type: "failure"; stage: "test"; report: Report };
 
 type Outcome = { specifier: Specifier; result: Result };
 
@@ -69,9 +71,8 @@ type Stage = "link" | "test";
 type Status =
   | { type: "todo" }
   | { type: "pending"; stage: Stage }
-  | { type: "failure"; stage: Stage; error: Error }
-  | { type: "success"; stage: Stage }
-  | { type: "done"; skipped: boolean };
+  | { type: "done"; skipped: boolean }
+  | Result;
 
 type Node = {
   status: Status;
@@ -82,8 +83,8 @@ type Node = {
 type Graph = Map<Specifier, Node>;
 
 type ExtractCache = MutMap<Hash, Promise<Either<Error, Set<Target>>>>;
-type LintCache = MutMap<Hash, Promise<Either<Error, undefined>>>;
-type TestCache = MutMap<DeepHash, Promise<Either<Error, undefined>>>;
+type LintCache = MutMap<Hash, Promise<Either<Error, Maybe<Report>>>>;
+type TestCache = MutMap<DeepHash, Promise<Either<Error, Maybe<Report>>>>;
 
 type Cache = {
   extract: ExtractCache;

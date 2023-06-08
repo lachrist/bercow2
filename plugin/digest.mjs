@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
+import { associateTest } from "./layout.mjs";
 
-/** @type {DigestPlugin} */
-export default (specifier) =>
+/** @type {(url: URL) => Promise<Hash>} */
+const digestFile = (url) =>
   new Promise((resolve, reject) => {
     const hashing = createHash("sha256");
     hashing.on("error", reject);
@@ -14,9 +15,21 @@ export default (specifier) =>
         resolve(data.toString("hex"));
       }
     });
-    hashing.write(specifier, "utf8");
-    hashing.write("\0", "utf8");
-    const readable = createReadStream(new URL(specifier));
+    const readable = createReadStream(url);
     readable.on("error", reject);
     readable.pipe(hashing);
   });
+
+/** @type {DigestPlugin} */
+export default async (specifier) => {
+  const hashing = createHash("sha256");
+  const dump = [specifier];
+  dump.push(await digestFile(new URL(specifier)));
+  try {
+    dump.push(await digestFile(new URL(associateTest(specifier))));
+  } catch (_error) {
+    // ignore
+  }
+  hashing.update(JSON.stringify(dump));
+  return hashing.digest("hex");
+};

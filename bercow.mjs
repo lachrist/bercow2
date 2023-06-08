@@ -21,4 +21,6 @@ const graph = await bercow(new Set([import.meta.url]), {
   cache: new URL(".bercow.json", import.meta.url),
 });
 
+console.dir(graph, { depth: Infinity });
+
 stdout.write(toDotFormat(graph), "utf8");

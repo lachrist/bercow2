@@ -1,8 +1,3 @@
-
-// /** @type {LintPlugin} */
-// export default async (_specifier) => {};
-
-
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 // @ts-ignore
@@ -16,14 +11,15 @@ const formatter = await eslint.loadFormatter("stylish");
 export default async (specifier) => {
   const content = await readFile(new URL(specifier), "utf8");
   if (!Prettier.check(content, { filepath: fileURLToPath(specifier) })) {
-    throw new Error("not formatted according to prettier");
+    return `${specifier} is not formatted according to prettier`;
   } else {
     const results = await eslint.lintText(content, {
       filePath: fileURLToPath(specifier),
     });
-    const message = await formatter.format(results);
-    if (message !== "") {
-      throw new Error(message);
+    const report = await formatter.format(results);
+    if (report !== "") {
+      return report;
     }
   }
+  return null;
 };
