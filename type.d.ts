@@ -1,38 +1,11 @@
-/////////////
-// Prelude //
-/////////////
+//////////
+// Util //
+//////////
 
-type json = null | boolean | number | string | json[] | { [key: string]: json };
-
-type Nil = null;
-type Cons<A> = { car: A; cdr: List<A> };
-type List<A> = Nil | Cons<A>;
-
-type Left<A> = { left: A };
-type Right<B> = { right: B };
-type Either<A, B> = Left<A> | Right<B>;
-
-type Nothing = null;
-type Just<A> = { just: A };
-type Maybe<A> = Nothing | Just<A>;
-
+type Either<A, B> = { left: A } | { right: B };
+type Maybe<A> = null | { just: A };
 type Pair<A, B> = [A, B];
-
-///////////
-// Graph //
-///////////
-
-type Index = number;
-
-type Partition<N> = Map<N, Index>;
-
-type Topology = Map<Index, Index[]>;
-
-type ComponentGraph<N> = {
-  counter: Index;
-  partition: Partition<N>;
-  topology: Topology;
-};
+type json = null | boolean | number | string | json[] | { [key: string]: json };
 
 ////////////
 // Impure //
@@ -55,16 +28,15 @@ type MutMap<K, V> = { map: Map<K, V> };
 type Specifier = string;
 type Target = string;
 type Hash = string;
-type ShallowHash = string;
 type DeepHash = string;
 
 type DigestPlugin = (specifier: Specifier) => Promise<Hash>;
-type LintPlugin = (specifier: Specifier) => Promise<void>;
 type ExtractPlugin = (specifier: Specifier) => Promise<Set<Target>>;
 type ResolvePlugin = (
   target: Target,
   origin: Specifier
 ) => Promise<Set<Specifier>>;
+type LintPlugin = (specifier: Specifier) => Promise<void>;
 type TestPlugin = (specifier: Specifier) => Promise<void>;
 
 type Plugin = {
@@ -75,29 +47,24 @@ type Plugin = {
   test: TestPlugin;
 };
 
-type LintResult = Either<Error, ShallowHash>;
-type Lint = (specifier: Specifier) => Promise<LintResult>;
-
-type LinkResult = Either<Error, Set<Specifier>>;
-type Link = (specifier: Specifier, hash: ShallowHash) => Promise<LinkResult>;
-
-type TestResult = Maybe<Error>;
-type Test = (specifier: Specifier, hash: DeepHash) => Promise<TestResult>;
-
-type LintAction = { type: "lint"; specifier: Specifier };
-type LinkAction = { type: "link"; specifier: Specifier; hash: ShallowHash };
-type TestAction = { type: "test"; specifier: Specifier; hash: DeepHash };
-
-type Action = LintAction | LinkAction | TestAction;
+type Action =
+  | { type: "link"; specifier: Specifier }
+  | {
+      type: "test";
+      specifier: Specifier;
+      hash: Hash;
+      deep: DeepHash;
+    };
 
 type Result =
-  | { type: "lint"; inner: LintResult }
-  | { type: "link"; inner: LinkResult }
-  | { type: "test"; inner: TestResult };
+  | { type: "success"; stage: "link"; hash: Hash; dependencies: Set<Specifier> }
+  | { type: "failure"; stage: "link"; error: Error }
+  | { type: "success"; stage: "test" }
+  | { type: "failure"; stage: "test"; error: Error };
 
 type Outcome = { specifier: Specifier; result: Result };
 
-type Stage = "lint" | "link" | "test";
+type Stage = "link" | "test";
 
 type Status =
   | { type: "todo" }
@@ -113,3 +80,13 @@ type Node = {
 };
 
 type Graph = Map<Specifier, Node>;
+
+type ExtractCache = MutMap<Hash, Promise<Either<Error, Set<Target>>>>;
+type LintCache = MutMap<Hash, Promise<Either<Error, undefined>>>;
+type TestCache = MutMap<DeepHash, Promise<Either<Error, undefined>>>;
+
+type Cache = {
+  extract: ExtractCache;
+  lint: LintCache;
+  test: TestCache;
+};
